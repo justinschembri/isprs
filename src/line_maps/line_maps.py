@@ -7,30 +7,43 @@ import json
 @dataclass
 class LineMapLine:
     """
-    Represents the contents of a range of lines within a document to be parsed.
+    Information model for a line from a linemap.
+
+    A linemap is a set of integer and string descriptions which define what content is
+    found at which line and within which column of some text based observation file. 
+    Example:
+
+    ```
+    line 1, columns 0 - 80: Observation Title
+    line 2, columns 0 - 40: Observation Date
+    line 2, columns 41 - 80: Observation Location
+    ```
 
     Attributes:
-        key (str): Descriptor (key) of the contents of a given block of text.
-        start (int): The starting column corresponding to that block of text.
-        stop (int): The finishing column (inclusive) corresponding to that block of text.
-        map (dict[str,range]): A dict object containing the mapping and set in post-init.
+        line (int)
+        column_start (int)
+        column_end (int)
+        short_description (str)
+        line_map_line (Dict[int, Tuple[range, str]]): post-init attribute where
+        integer keys represent the line number, and the values are a 2 dimensional tuple
+        of type range representing the column start and finish, and a string containing
+        the short description.
     """
 
     line: int
     column_start: int
     column_end: int
     short_description: str
-    line_map: Dict[int, List[Tuple[range, str]]] = field(
+    line_map_line: Dict[int, Tuple[range, str]] = field(
         init=False
     )  # post-init attribute
 
     def __post_init__(self):
         if self.column_start > self.column_end:
             raise ValueError(f"Column start must be greater than column finish.")
-        self.line_map = {
-            self.line: [
+        self.line_map_line = {
+            self.line: 
                 (range(self.column_start, self.column_end), self.short_description)
-            ]
         }
 
     def __repr__(self):
@@ -58,6 +71,14 @@ class LineMap:
 
 
 def lineMap_parser(json_path: Path) -> "LineMap":
+    """Parse a json line map and return a LineMap object.
+
+    Args:
+        json_path (Path): Path to JSON line map.
+
+    Returns:
+        LineMap object.
+    """
     with open(json_path) as j:
         json_data = json.load(j)
 
@@ -77,6 +98,3 @@ def lineMap_parser(json_path: Path) -> "LineMap":
 
 
 CSMIP_V2_LINEMAP = lineMap_parser("src/line_maps/csimp_v2.json")
-
-if __name__ == '__main__':
-    print(CSMIP_V2_LINEMAP)
