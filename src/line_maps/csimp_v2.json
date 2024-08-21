@@ -1,0 +1,258 @@
+{
+    "source_name": "CSMIP_V2",
+    "lines": [
+      {
+        "line": 1,
+        "column_start": 1,
+        "column_end": 80,
+        "short_description": "vol2_title",
+        "long_description": "Vol. 2 title line, which includes record identifier and channel identification"
+      },
+      {
+        "line": 2,
+        "column_start": 1,
+        "column_end": 80,
+        "short_description": "vol1_title",
+        "long_description": "Vol. 1 t i t l e line, which includes processing date and directory identifier"
+      },
+      {
+        "line": 3,
+        "column_start": 1,
+        "column_end": 40,
+        "short_description": "eq_name",
+        "long_description": "Earthquake name (actual number of characters used in name is element 29 of integer header array, IHDR)"
+      },
+      {
+        "line": 4,
+        "column_start": 1,
+        "column_end": 40,
+        "short_description": "eq_datetime",
+        "long_description": "Earthquake date, time (local time)"
+      },
+      {
+        "line": 4,
+        "column_start": 41,
+        "column_end": 80,
+        "short_description": "eq_origin_time",
+        "long_description": "Earthquake o r i g i n time (GMT)"
+      },
+      {
+        "line": 5,
+        "column_start": 1,
+        "column_end": 24,
+        "short_description": "accelerogram_id",
+        "long_description": "Accelerogram identification number"
+      },
+      {
+        "line": 5,
+        "column_start": 36,
+        "column_end": 80,
+        "short_description": "trigger_time",
+        "long_description": "Trigger time (CMT), if available"
+      },
+      {
+        "line": 6,
+        "column_start": 13,
+        "column_end": 17,
+        "short_description": "station_number",
+        "long_description": "Station number"
+      },
+      {
+        "line": 6,
+        "column_start": 21,
+        "column_end": 27,
+        "short_description": "station_lat",
+        "long_description": "Station latitude; N or S in column 27"
+      },
+      {
+        "line": 6,
+        "column_start": 30,
+        "column_end": 37,
+        "short_description": "station_long",
+        "long_description": "Station longitude; E or Win column 37"
+      },
+      {
+        "line": 6,
+        "column_start": 40,
+        "column_end": 47,
+        "short_description": "instrument_type",
+        "long_description": "I n s t r u m e n t t y p e ( e - g . , SMA, RFT, CRA)"
+      },
+      {
+        "line": 6,
+        "column_start": 54,
+        "column_end": 57,
+        "short_description": "instrument_serial_num",
+        "long_description": "Instrument s e r i a l number"
+      },
+      {
+        "line": 6,
+        "column_start": 60,
+        "column_end": 61,
+        "short_description": "num_of_channels",
+        "long_description": "Number of channels on this accelerograph"
+      },
+      {
+        "line": 6,
+        "column_start": 71,
+        "column_end": 72,
+        "short_description": "total_num_channels",
+        "long_description": "Total number of channels at station ( i f different)"
+      },
+      {
+        "line": 7,
+        "column_start": 1,
+        "column_end": 40,
+        "short_description": "station_name",
+        "long_description": "Station name (actual number of characters used in name is element 30 of integer header IHDR)."
+      },
+      {
+        "line": 8,
+        "column_start": 6,
+        "column_end": 7,
+        "short_description": "accelerogram_channel_num",
+        "long_description": "Accelerogram channel number of this component"
+      },
+      {
+        "line": 8,
+        "column_start": 10,
+        "column_end": 14,
+        "short_description": "azmimuth",
+        "long_description": "If horizontal component, azimuth (0-360, measured clockwise from North, in cols 10-12); if vertical component, 'UP', or 'DOWN'"
+      },
+      {
+        "line": 8,
+        "column_start": 29,
+        "column_end": 30,
+        "short_description": "station_channel_num",
+        "long_description": "Station channel number, if multi-instrument station"
+      },
+      {
+        "line": 8,
+        "column_start": 47,
+        "column_end": 80,
+        "short_description": "location_description",
+        "long_description": "Description of sensor location in structure, when appropriate"
+      },
+      {
+        "line": 9,
+        "column_start": 1,
+        "column_end": 80,
+        "short_description": "eq_title_line",
+        "long_description": "Earthquake title line, including name and date (actual no. of characters used in title line is element 31 of IHDR."
+      },
+      {
+        "line": 10,
+        "column_start": 1,
+        "column_end": 45,
+        "short_description": "eq_hypocenter",
+        "long_description": "Earthquake hypocenter information (latitude, longitude, depth)"
+      },
+      {
+        "line": 10,
+        "column_start": 45,
+        "column_end": 80,
+        "short_description": "eq_magnitude",
+        "long_description": "Earthquake magnitude (ML; other magnitudes may also be listed)"
+      },
+      {
+        "line": 11,
+        "column_start": 15,
+        "column_end": 21,
+        "short_description": "transducer_period",
+        "long_description": "1 Transducer natural period (seconds)"
+      },
+      {
+        "line": 11,
+        "column_start": 39,
+        "column_end": 43,
+        "short_description": "damping",
+        "long_description": "Damping (fraction of critical)"
+      },
+      {
+        "line": 11,
+        "column_start": 60,
+        "column_end": 64,
+        "short_description": "sensitivity",
+        "long_description": "Sensitivity"
+      },
+      {
+        "line": 12,
+        "column_start": 40,
+        "column_end": 46,
+        "short_description": "record_length",
+        "long_description": "Length in seconds of Vol. 2 digitized record"
+      },
+      {
+        "line": 13,
+        "column_start": 51,
+        "column_end": 55,
+        "short_description": "vol1_pga",
+        "long_description": "Vol. 1 peak acceleration (g)"
+      },
+      {
+        "line": 13,
+        "column_start": 64,
+        "column_end": 70,
+        "short_description": "pga_time",
+        "long_description": "Time of peak acceleration (seconds after triggering)"
+      },
+      {
+        "line": 14,
+        "column_start": 31,
+        "column_end": 36,
+        "short_description": "vol1_rms",
+        "long_description": "RMS Of Vol. 1acceleration (8)"
+      },
+      {
+        "line": 15,
+        "column_start": 1,
+        "column_end": 80,
+        "short_description": "freq_limits",
+        "long_description": "Frequency limits used in the band-pass filtering"
+      },
+      {
+        "line": 16,
+        "column_start": 1,
+        "column_end": 6,
+        "short_description": "vol2_num_points",
+        "long_description": "Number of Vol. 2 acceleration, velocity and displacement points"
+      },
+      {
+        "line": 17,
+        "column_start": 1,
+        "column_end": 45,
+        "short_description": "vol2_timestep",
+        "long_description": "Time step of Vol. 2 data (equally-spaced)"
+      },
+      {
+        "line": 18,
+        "column_start": 1,
+        "column_end": 64,
+        "short_description": "vol2_value_and_time_pga",
+        "long_description": "Value and tine of Vol. 2 peak acceleration (tine, in seconds after triggering)"
+      },
+      {
+        "line": 19,
+        "column_start": 1,
+        "column_end": 64,
+        "short_description": "value_and_time_pv",
+        "long_description": "Value and time of peak velocity"
+      },
+      {
+        "line": 20,
+        "column_start": 1,
+        "column_end": 64,
+        "short_description": "val_and_time_pd",
+        "long_description": "Value and time of peak displacement"
+      },
+      {
+        "line": 21,
+        "column_start": 1,
+        "column_end": 78,
+        "short_description": "initial_vel_and_displacement",
+        "long_description": "Initial velocity and displacement (computed during processing)"
+      }
+    ]
+  }
+  
