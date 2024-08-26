@@ -1,43 +1,73 @@
 from dataclasses import dataclass
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Literal
 import json
 from datetime import datetime
+from collections import namedtuple
+
+
+@dataclass
+class SensorThingsObject:
+    entity: Literal[
+        "Sensor",
+        "ObservedProperty",
+        "Datastream",
+        "Observation",
+        "FeatureOfInterest",
+        "Historical Location",
+        "Location",
+        "Thing",
+    ]
+    field: str
+    value: Any
+
+    def __post_init__(self):
+        # TODO: #3 add type enforcement.
+        pass
+
+    def __repr__(self) -> str:
+        return f"({self.entity}.{self.field}, {self.value})"
 
 
 @dataclass
 class Sensor:
-    name: str
-    description: str
-    properties: Dict[str | Any] #could potentially be a JSON object class.
-    encodingType: str
-    metadata: Any
+    name: str | None = None
+    description: str | None = None
+    properties: Dict[str, Any] | None = (
+        None  # could potentially be a JSON object class.
+    )
+    encodingType: str | None = None
+    metadata: Any | None = None
+
 
 @dataclass
 class ObservedProperty:
     name: str
     definition: str
     description: str
-    properties: Dict[str | Any] #could potentially be a JSON object class.
+    properties: Dict[str, Any]  # could potentially be a JSON object class.
+
 
 @dataclass
 class Datastream:
     name: str
     description: str
-    observationType: int # check about this
+    observationType: int  # check about this
     unitOfMeasurement: str
     observedArea: str
     phenomenonTime: Tuple[datetime, datetime]
     resultTime: Tuple[datetime, datetime]
-    properties: Dict [str | Any]
+    properties: Dict[str, Any]
+
 
 @dataclass
 class Observation:
-    result: Any
-    phenomenonTime: datetime
-    resultTime: datetime
-    validTime: datetime
-    resultQuality: Any #check about this
-    parameters: Dict[str, Any] #could potentially be a JSON object class.
+    result: Any | None
+    phenomenonTime: datetime | None
+    resultTime: datetime | None
+    validTime: datetime | None
+    resultQuality: Any | None  # check about this
+    parameters: Dict[str, Any] | None  # could potentially be a JSON object class.
+
 
 @dataclass
 class FeatureOfInterest:
@@ -47,11 +77,13 @@ class FeatureOfInterest:
     encodingType: str
     feature: Any
 
+
 @dataclass
 class Thing:
     name: str
     description: str
-    properties: Dict[str, Any] #could potentially be a JSON object class.
+    properties: Dict[str, Any]  # could potentially be a JSON object class.
+
 
 @dataclass
 class Location:
@@ -59,4 +91,4 @@ class Location:
     description: str
     properties: Dict[str, Any]
     encodingType: str
-    location: Any # sure about this?
+    location: Any  # sure about this?

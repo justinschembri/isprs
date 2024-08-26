@@ -117,7 +117,7 @@
         "line": 8,
         "column_start": 10,
         "column_end": 14,
-        "short_description": "azmimuth",
+        "short_description": "azimuth",
         "long_description": "If horizontal component, azimuth (0-360, measured clockwise from North, in cols 10-12); if vertical component, 'UP', or 'DOWN'"
       },
       {
