@@ -5,8 +5,9 @@ from abc import ABC
 from typing import Dict, List, Union, Callable, Generator, Tuple, Any
 from dataclasses import dataclass, field
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
+from collections import namedtuple
 
 from line_maps.line_maps import LineMapLine, LineMap
 
@@ -14,7 +15,16 @@ from line_maps.line_maps import LineMapLine, LineMap
 import pytz
 
 # project imports
-# import src.sensor_things.model as st
+from src.sensor_things.model import (
+    Sensor,
+    ObservedProperty,
+    Datastream,
+    Observation,
+    FeatureOfInterest,
+    Thing,
+    Location,
+    SensorThingsObject,
+)
 
 # class LineSubParser(ABC):
 #     """
@@ -48,11 +58,15 @@ class LineParser(ABC):
         self.data_path = data_path
         self.chunks: Dict[str, str] = self._chunk()
 
+        self._global_metadata: List["SensorThingsObject"] = []
+        self.raw_results = {}
+        self.st_results = {}
+
     def _chunk(self) -> Dict[str, str]:
         """Split lines using the LineParser's line map.
 
         Returns:
-            A dict[str, str] where keys are the short description of the data entry as 
+            A dict[str, str] where keys are the short description of the data entry as
             per the LineMap, and values are the value from the observation set.
         """
         lines = {}
@@ -78,197 +92,449 @@ class CsimpV2(LineParser):
     Parser for CSIMP V2 Observations.
     """
 
-    def vol2_title_subparser(self) -> Dict[str, str]:
+    def vol2_title_subparser(self) -> None:
         split = self.chunks["vol2_title"].split()
-        return {"Record ID":split[2],
-                "Channel":split[5]}
-    
-    def vol1_title_subparser(self) -> Dict[str, str | datetime]:
-        split = self.chunks["vol1_title"].split()
-        return {"V1 Processing Date": datetime.strptime(split[4].strip(','), "%m/%d/%y"),
-                "V1 Processor":split[5],
-                "V1 Directory Reference":split[6]}
-    
-    def eq_name_subparser(self) -> Dict[str, str]:
-        return {"Earthquake or Record Name":self.chunks['eq_name'].strip()}
-    
-    def eq_datetime_subparser(self) -> Dict[str, str]:
-        return {"Earthquake Date (or Preliminary Processing)":self.chunks['eq_datetime'].strip()}
-    
-    def eq_origin_time_subparser(self) -> Dict[str, str]:
-        return {"Earthquake Origin Time (if known)": self.chunks['eq_origin_time'].strip()}
-    
-    def accelerogram_id_subparser(self) -> Dict[str, str]:
-        return {"Accelerogram ID": self.chunks['accelerogram_id'].strip()}
-    
-    def trigger_time_subparser(self) -> Dict[str, datetime]:
-        split = self.chunks['trigger_time'].split()
-        trigger_datetime = datetime.strptime(
-            split[2].strip(',') + " " + split[3], '%m/%d/%y %H:%M:%S.%f'
-            )
-        timezone = pytz.timezone(self.chunks['trigger_time'].split()[4])
-        trigger_datetime = timezone.localize(trigger_datetime)
-        return {f'Trigger Datetime {timezone}':trigger_datetime}
-    
-    def station_number(self) -> Dict[str, int]:
-        return {"Station Number":int(self.chunks['station_number'])}
-    
-    def station_lat_parser(self) -> Dict[str, float]:
-        #TODO: Confirm interoperability of this format.
-        value, hemisphere = self.chunks['station_lat'][:-2], self.chunks['station_lat'][-1]
-        if hemisphere == 'N':
-            return {'Station Latitude':float(value)}
-        elif hemisphere == 'S':
-            return {'Station Latitude':float(value)*-1}
-    
-    def station_long_parser(self) -> Dict[str, float]:
-        value, hemisphere = self.chunks['station_long'][:-2], self.chunks['station_long'][-1]
-        if hemisphere == 'E':
-            return {'Station Latitude':float(value)}
-        elif hemisphere == 'W':
-            return {'Station Latitude':float(value)*-1}
+        record_id = split[2]
+        channel = split[5]
+        self.raw_results.update({"Record ID": record_id, "Channel": channel})
+        self._global_metadata += [
+            SensorThingsObject(
+                "Datastream", "properties", {"Record ID": record_id}
+            ),
+            SensorThingsObject("Observation", "parameters", {"Channel": channel}),
+        ]
 
-    def instrument_type_parser(self) -> Dict[str, str]:
-        return {"Instrument Type":self.chunks['instrument_type'].strip()}
-    
-    def instrument_serial_num_parser(self) -> Dict[str, int]:
-        return {"Instrument Serial Number": int(self.chunks['instrument_serial_num'])}
-    
-    def num_of_channels_parser(self) -> Dict[str, int]:
-        return {"Number of Channels": int(self.chunks['num_of_channels'])}
-    
-    def total_num_of_channels_parser(self) -> Dict[str, int]:
+    def vol1_title_subparser(self) -> None:
+        split = self.chunks["vol1_title"].split()
+        v1_process_date = datetime.strptime(split[4].strip(","), "%m/%d/%y")
+        v1_processor = split[5]
+        v1_dir_ref = split[6]
+        self.raw_results.update(
+            {
+                "V1 Processing Date": v1_process_date,
+                "V1 Processor": v1_processor,
+                "V1 Directory Reference": v1_dir_ref,
+            }
+        )
+        self._global_metadata += [
+            SensorThingsObject(
+                "Datastream",
+                "properties",
+                {"Raw Data Processing Date": v1_process_date,
+                 "Raw Data Processed By": v1_processor,
+                 "Raw Data Internal Reference": v1_dir_ref},
+            ),
+        ]
+
+    def eq_name_subparser(self) -> None:
+        earthquake_name = self.chunks["eq_name"].strip()
+        self.raw_results.update({"Earthquake or Record Name": earthquake_name})
+        # no need to add a SensorThingsObject as their is doubling up of information.
+
+    def eq_datetime_subparser(self) -> None:
+        earthquake_date = self.chunks["eq_datetime"].strip()
+        self.raw_results.update(
+            {"Earthquake Date (or Preliminary Processing)": earthquake_date}
+        )
+        self._global_metadata += [
+            SensorThingsObject(
+                "FeatureOfInterest",
+                "properties",
+                {"Earthquake Date or Record Status": earthquake_date},
+            )
+        ]
+
+    def eq_origin_time_subparser(self) -> None:
         try:
-            total_channels = int(self.chunks['total_num_channels'])
+            earthquake_origin_time = datetime.strptime(
+                self.chunks["eq_origin_time"].strip(), "%m/%d/%y %H:%M:%S.%f"
+            )
         except:
-            total_channels = self.num_of_channels_parser()['Number of Channels']
-        return {"Total Number of Channels":total_channels}
-    
-    def station_name_parser(self) -> Dict[str, str]:
-        return {'Station Name':self.chunks['station_name'].strip()}
-    
-    def accelerogram_channel_num_parser(self) -> Dict[str, int]:
-        return {'Accelerogram Channel Number':int(self.chunks['accelerogram_channel_num'])}
-    
-    def azimuth_parser(self) -> Dict[str, str]:
-        return {'Azimuth':self.chunks['azmimuth']}
-    
-    def station_channel_num(self) -> Dict[str, str | None]:
+            earthquake_origin_time = None
+        self.raw_results.update({"Earthquake Origin Time": earthquake_origin_time})
+        self._global_metadata += [
+            SensorThingsObject(
+                "FeatureOfInterest",
+                "properties",
+                {"Origin Time": earthquake_origin_time},
+            )
+        ]
+
+    def accelerogram_id_subparser(self) -> None:
+        accelerogram_id = self.chunks["accelerogram_id"].strip()
+        self.raw_results.update({"Accelerogram ID": accelerogram_id})
+        self._global_metadata += [
+            SensorThingsObject(
+                "Sensor", "metadata", {"type": "accelerogram", "id": accelerogram_id}
+            )
+        ]
+
+    def trigger_time_subparser(self) -> None:
+        split = self.chunks["trigger_time"].split()
+        record_length = float(self.chunks["record_length"]) #TODO: #5 better handling of this.
+        trigger_datetime = datetime.strptime(
+            split[2].strip(",") + " " + split[3], "%m/%d/%y %H:%M:%S.%f"
+        )
+        timezone = pytz.timezone(self.chunks["trigger_time"].split()[4])
+        trigger_datetime = timezone.localize(trigger_datetime)
+        self.raw_results.update({f"Trigger Datetime {timezone}": trigger_datetime})
+        self._global_metadata += [
+            SensorThingsObject(
+                "Datastream", "phenomenonTime", (trigger_datetime, trigger_datetime + timedelta(seconds=record_length))
+            )
+        ]
+
+    def station_number(self) -> None:
+        station_number = int(self.chunks["station_number"])
+        self.raw_results.update({"Station Number": station_number})
+        self._global_metadata += [
+            SensorThingsObject(
+                "Datastream", "properties", {"Station Number": station_number}
+            )
+        ]
+
+    def station_lat_parser(self) -> None:
+        # TODO: Confirm interoperability of this format.
+        value, hemisphere = (
+            float(self.chunks["station_lat"][:-2]),
+            self.chunks["station_lat"][-1],
+        )
+        if hemisphere == "N":
+            self.raw_results.update({"Station Latitude": value})
+        elif hemisphere == "S":
+            self.raw_results.update({"Station Latitude": value * -1})
+
+    def station_long_parser(self) -> None:
+        value, hemisphere = (
+            float(self.chunks["station_long"][:-2]),
+            self.chunks["station_long"][-1],
+        )
+        if hemisphere == "E":
+            self.raw_results.update({"Station Longitude": value})
+        elif hemisphere == "W":
+            self.raw_results.update({"Station Longitude": value * -1})
+
+    def sensor_things_location_parser(self) -> None:
+        self._global_metadata += [
+            SensorThingsObject(
+                "Location",
+                "location",
+                {
+                    "type": "Point",
+                    "coordinates": (
+                        self.raw_results["Station Longitude"],
+                        self.raw_results["Station Latitude"],
+                    ),
+                },
+            )
+        ]
+
+    def instrument_type_parser(self) -> None:
+        instrument_type = self.chunks["instrument_type"].strip()
+        self.raw_results.update({"Instrument Type": instrument_type})
+        self._global_metadata += [
+            SensorThingsObject(
+                "Sensor", "metadata", {"Instrument Type": instrument_type}
+            )
+        ]
+
+    def instrument_serial_num_parser(self) -> None:
+        instrument_serial_num = int(self.chunks["instrument_serial_num"])
+        self.raw_results.update({"Instrument Serial Number": instrument_serial_num})
+        self._global_metadata += [
+            SensorThingsObject(
+                "Sensor",
+                "metadata",
+                {"Instrument Serial Number": instrument_serial_num},
+            )
+        ]
+
+    def num_of_channels_parser(self) -> None:
+        number_of_channels = int(self.chunks["num_of_channels"])
+        self.raw_results.update({"Number of Channels": number_of_channels})
+        self._global_metadata += [
+            SensorThingsObject(
+                "Sensor", "metadata", {"Number of Channels": number_of_channels}
+            )
+        ]
+
+    def total_num_of_channels_parser(self) -> None:
         try:
-            station_channel_number = int(self.chunks['station_channel_num'])
+            total_channels = int(self.chunks["total_num_channels"])
+        except:
+            total_channels = self.raw_results["Number of Channels"]
+        self.raw_results.update({"Total Number of Channels": total_channels})
+        self._global_metadata += [
+            SensorThingsObject("Sensor", "metadata", {"Total Channels": total_channels})
+        ]
+
+    def station_name_parser(self) -> None:
+        station_name = self.chunks["station_name"].strip()
+        self.raw_results.update({"Station Name": station_name})
+        self._global_metadata += [SensorThingsObject("Location", "name", station_name)]
+
+    def accelerogram_channel_num_parser(self) -> None:
+        accelerogram_channel_number = int(self.chunks["accelerogram_channel_num"])
+        self.raw_results.update(
+            {"Accelerogram Channel Number": accelerogram_channel_number}
+        )
+        self._global_metadata += [
+            SensorThingsObject(
+                "Sensor",
+                "parameters",
+                {"Accelerogram Channel Number": accelerogram_channel_number},
+            )
+        ]
+
+    def azimuth_parser(self) -> None:
+        azimuth = self.chunks["azimuth"].strip()
+        self.raw_results.update({"Azimuth": azimuth})
+        self._global_metadata += [
+            SensorThingsObject("Observation", "parameters", {"Azimuth": azimuth})
+        ]
+
+    def station_channel_num(self) -> None:
+        try:
+            station_channel_number = int(self.chunks["station_channel_num"])
         except:
             station_channel_number = None
-        return {'Station Channel Number': station_channel_number}
-    
-    def location_description_parser(self) -> Dict[str, str]:
-        return {'Location Description':self.chunks['location_description'].strip()}
-    
-    def earthquake_title_line(self) -> Dict[str, str]:
-        return {'Earthquake Title':self.chunks['eq_title_line'].strip()}
-    
-    def eq_hypocenter_parser(self):
-        hypocenter = self.chunks['eq_hypocenter'].split(':')[1].strip()
-        return {'Earthquake Hypocenter': hypocenter}
+        self.raw_results.update({"Station Channel Number": station_channel_number})
+        self._global_metadata += [
+            SensorThingsObject(
+                "Sensor",
+                "properties",
+                {"Station Channel Number": station_channel_number},
+            )
+        ]
 
-    def eq_magnitude(self):
-        split = self.chunks['eq_magnitude'].split(':')
-        return {'Earthquake Magnitude':split[1].strip(), 'Magnitude Type':split[0].strip()}
-    
-    def transducer_period_parse(self):
-        return {'Transducer Period': float(self.chunks['transducer_period'])}
-    
-    def damping_parse(self):
-        return {'Damping': float(self.chunks['damping'])}
-    
-    def sensitivity_parse(self):
-        return {'Sensitivity': float(self.chunks['sensitivity'])}
-    
-    def record_length_parse(self):
-        return {'Record Length': float(self.chunks['record_length'])}
-    
-    def vol1_pga_parse(self):
-        return {'V1 PGA': float(self.chunks['vol1_pga'])}
-    
-    def pga_time(self):
-        return {'PGA Time': float(self.chunks['pga_time'])}
-    
-    def vol1_rms_parse(self):
-        rms = self.chunks['vol1_rms'] if self.chunks['vol1_rms'] else None
-        return {'Root Mean Square V1': rms}
-    
-    def freq_limits_parse(self):
-        return {'Frequency Limits:': self.chunks['freq_limits'].strip()}
-    
-    def vol2_timestep_parse(self):
-        split = re.search(r'\.\d+\s*sec', self.chunks['vol2_timestep']).group().split()
-        return {'Timestep Value':split[0], 'Timestep Unit': split[1]}
-    
-    def vol2_pga_parse(self):
-        split = [t.strip() for t in self.chunks['vol2_value_and_time_pga'].split()]
+    def location_description_parser(self) -> None:
+        location_description = self.chunks["location_description"].strip()
+        self.raw_results.update({"Location Description": location_description})
+        self._global_metadata += [
+            SensorThingsObject("Thing", "name", location_description),
+        ]
+
+    def earthquake_title_line(self) -> None:
+        earthquake_title_line = self.chunks["eq_title_line"].strip()
+        self.raw_results.update({"Earthquake Title": earthquake_title_line})
+        self._global_metadata += [
+            SensorThingsObject("FeatureOfInterest", "name", earthquake_title_line)
+        ]
+
+    def eq_hypocenter_parser(self) -> None:
+        hypocenter = self.chunks["eq_hypocenter"].split(":")[1].strip()
+        self.raw_results.update({"Earthquake Hypocenter": hypocenter})
+        self._global_metadata += [
+            SensorThingsObject(
+                "FeatureOfInterest", "properties", {"Hypocenter": hypocenter}
+            )
+        ]
+
+    def eq_magnitude_parser(self) -> None:
+        split = self.chunks["eq_magnitude"].split(":")
+        earthquake_magnitude = split[1].strip()
+        magnitude_type = split[0].strip()
+        self.raw_results.update(
+            {
+                "Earthquake Magnitude": earthquake_magnitude,
+                "Magnitude Type": magnitude_type,
+            }
+        )
+        self._global_metadata += [
+            SensorThingsObject(
+                "FeatureOfInterest",
+                "properties",
+                {"Earthquake Magnitude": earthquake_magnitude},
+            ),
+            SensorThingsObject(
+                "FeatureOfInterest", "properties", {"Magnitude Type": magnitude_type}
+            ),
+        ]
+
+    def transducer_period_parse(self) -> None:
+        transducer_period = float(self.chunks["transducer_period"])
+        self.raw_results.update({"Transducer Period": transducer_period})
+        self._global_metadata += [
+            SensorThingsObject(
+                "Sensor", "properties", {"Transducer Period": transducer_period}
+            )
+        ]
+
+    def damping_parse(self) -> None:
+        damping = float(self.chunks["damping"])
+        self.raw_results.update({"Damping": damping})
+        self._global_metadata += [
+            SensorThingsObject("Sensor", "properties", {"Damping": damping})
+        ]
+
+    def sensitivity_parse(self) -> None:
+        sensitivity = float(self.chunks["sensitivity"])
+        self.raw_results.update({"Sensitivity": sensitivity})
+        self._global_metadata += [
+            SensorThingsObject("Sensor", "properties", {"Sensitivity": sensitivity})
+        ]
+
+    def record_length_parse(self) -> None:
+        record_length = float(self.chunks["record_length"])
+        self.raw_results.update({"Record Length": record_length})
+        # no need for a SensorThings object as the record length is added to the
+        # phenomenonTime.
+        # TODO: #4 How does 'ObservedProperty' work with general units?
+
+    def vol1_pga_parse(self) -> None:
+        v1_pga = float(self.chunks["vol1_pga"])
+        self.raw_results.update({"V1 PGA": v1_pga})
+        self._global_metadata += [
+            SensorThingsObject("Datastream", "properties", {"Raw PGA": v1_pga})
+        ]
+
+    def pga_time(self) -> None:
+        v1_pga_time = float(self.chunks["pga_time"])
+        self.raw_results.update({"PGA Time": v1_pga_time})
+        self._global_metadata += [
+            SensorThingsObject(
+                "Datastream",
+                "properties",
+                {"Raw PGA Time": v1_pga_time, "Raw PGA Time Unit": "s"},
+            )
+        ]
+
+    def vol1_rms_parse(self) -> None:
+        rms = self.chunks["vol1_rms"] if self.chunks["vol1_rms"] else None
+        self.raw_results.update({"Root Mean Square V1": rms})
+        self._global_metadata += [
+            SensorThingsObject("Datastream", "properties", {"Raw RMS": rms})
+        ]
+
+    def freq_limits_parse(self) -> None:
+        frequency_limit = self.chunks["freq_limits"].strip()
+        self.raw_results.update({"Frequency Limits:": frequency_limit})
+        self._global_metadata += [
+            SensorThingsObject(
+                "Sensor", "properties", {"Frequency Limits": frequency_limit}
+            )
+        ]
+
+    def vol2_timestep_parse(self) -> None:
+        split = re.search(r"\.\d+\s*sec", self.chunks["vol2_timestep"]).group().split()
+        timestep_value, timestep_unit = split[0], split[1]
+        self.raw_results.update(
+            {"Timestep Value": timestep_value, "Timestep Unit": timestep_unit}
+        )
+        self._global_metadata += [
+            SensorThingsObject(
+                "Datastream",
+                "properties",
+                {"Timestep Value": timestep_value, "Timestep Unit": timestep_unit},
+            )
+        ]
+
+    def vol2_pga_parse(self) -> None:
+        split = [t.strip() for t in self.chunks["vol2_value_and_time_pga"].split()]
         pga = split[3]
         pga_unit = split[4]
-        return {'PGA':pga, 'PGA Unit':pga_unit}
-    
-    def value_and_time_pv_parse(self):
-        split = [t.strip() for t in self.chunks['value_and_time_pv'].split()]
+        self.raw_results.update({"PGA": pga, "PGA Unit": pga_unit})
+        self._global_metadata += [
+            SensorThingsObject(
+                "Datastream",
+                "properties",
+                {"Processed PGA": pga, "Processed PGA Unit": pga_unit},
+            )
+        ]
+
+    def value_and_time_pv_parse(self) -> None:
+        split = [t.strip() for t in self.chunks["value_and_time_pv"].split()]
         pv = split[3]
         pv_unit = split[4]
-        return {'PV': pv, 'PV Unit': pv_unit}
-    
-    def val_and_time_pd_parse(self):
-        split = [t.strip() for t in self.chunks['val_and_time_pd'].split()]
+        self.raw_results.update({"PV": pv, "PV Unit": pv_unit})
+        self._global_metadata += [
+            SensorThingsObject(
+                "Datastream",
+                "properties",
+                {"Peak Velocity": pv, "Peak Velocity Unit": pv_unit},
+            )
+        ]
+        # TODO: #6 unsure if this should remain here.
+
+    def val_and_time_pd_parse(self) -> None:
+        split = [t.strip() for t in self.chunks["val_and_time_pd"].split()]
         pd = split[3]
         pd_unit = split[4]
-        return {'PD':pd, 'PD Unit': pd}
-    
-    def initial_vel_and_displacement_parse(self):
-        split = [t.strip() for t in self.chunks['initial_vel_and_displacement'].split()]
+        self.raw_results.update({"PD": pd, "PD Unit": pd_unit})
+        self._global_metadata += [
+            SensorThingsObject(
+                "Datastream",
+                "properties",
+                {"Peak Displacement": pd, "Peak Displacement Unit": pd_unit},
+            )
+        ]
+
+    def initial_vel_and_displacement_parse(self) -> None:
+        split = [t.strip() for t in self.chunks["initial_vel_and_displacement"].split()]
         initial_vel = split[3]
         initial_vel_unit = split[4]
         initial_displacement = split[8]
         initial_displacement_unit = split[9]
-        return {'Initial V': initial_vel, 'Initial Vel Unit': initial_vel_unit,
-                'Initial Disp': initial_displacement, 'Initial Disp Unit': initial_displacement_unit}
+        self.raw_results.update(
+            {
+                "Initial Velocity": initial_vel,
+                "Initial Velocity Unit": initial_vel_unit,
+                "Initial Displacement": initial_displacement,
+                "Initial Displacement Unit": initial_displacement_unit,
+            }
+        )
+        self._global_metadata += [
+            SensorThingsObject(
+                "Datastream",
+                "properties",
+                {
+                    "Initial Velocity": initial_vel,
+                    "Initial Velocity Unit": initial_vel_unit,
+                    "Initial Displacement": initial_displacement,
+                    "Initial Displacement": initial_displacement_unit,
+                },
+            )
+        ]
 
     def parse(self):
-        values = {}
-        values.update(self.vol2_title_subparser())
-        values.update(self.vol1_title_subparser())
-        values.update(self.eq_name_subparser())
-        values.update(self.eq_datetime_subparser())
-        values.update(self.eq_origin_time_subparser())
-        values.update(self.accelerogram_id_subparser())
-        values.update(self.trigger_time_subparser())
-        values.update(self.station_number())
-        values.update(self.station_lat_parser())
-        values.update(self.station_long_parser())
-        values.update(self.instrument_type_parser())
-        values.update(self.instrument_serial_num_parser())
-        values.update(self.num_of_channels_parser())
-        values.update(self.total_num_of_channels_parser())
-        values.update(self.station_name_parser())
-        values.update(self.accelerogram_channel_num_parser())
-        values.update(self.azimuth_parser())
-        values.update(self.station_channel_num())
-        values.update(self.location_description_parser())
-        values.update(self.earthquake_title_line())
-        values.update(self.eq_hypocenter_parser())
-        values.update(self.eq_magnitude())
-        values.update(self.transducer_period_parse())
-        values.update(self.damping_parse())
-        values.update(self.sensitivity_parse())
-        values.update(self.record_length_parse())
-        values.update(self.vol1_pga_parse())
-        values.update(self.pga_time())
-        values.update(self.vol1_rms_parse())
-        values.update(self.freq_limits_parse())
-        values.update(self.vol2_timestep_parse())
-        values.update(self.vol2_pga_parse())
-        values.update(self.value_and_time_pv_parse())
-        values.update(self.val_and_time_pd_parse())
-        values.update(self.initial_vel_and_displacement_parse())
+        self.vol2_title_subparser()
+        self.vol1_title_subparser()
+        self.eq_name_subparser()
+        self.eq_datetime_subparser()
+        self.eq_origin_time_subparser()
+        self.accelerogram_id_subparser()
+        self.trigger_time_subparser()
+        self.station_number()
+        self.station_lat_parser()
+        self.station_long_parser()
+        self.sensor_things_location_parser()
+        self.instrument_type_parser()
+        self.instrument_serial_num_parser()
+        self.num_of_channels_parser()
+        self.total_num_of_channels_parser()
+        self.station_name_parser()
+        self.accelerogram_channel_num_parser()
+        self.azimuth_parser()
+        self.station_channel_num()
+        self.location_description_parser()
+        self.earthquake_title_line()
+        self.eq_hypocenter_parser()
+        self.eq_magnitude_parser()
+        self.transducer_period_parse()
+        self.damping_parse()
+        self.sensitivity_parse()
+        self.record_length_parse()
+        self.vol1_pga_parse()
+        self.pga_time()
+        self.vol1_rms_parse()
+        self.freq_limits_parse()
+        self.vol2_timestep_parse()
+        self.vol2_pga_parse()
+        self.value_and_time_pv_parse()
+        self.val_and_time_pd_parse()
+        self.initial_vel_and_displacement_parse()
 
-        return values
+        # return values
 
 
 # class ObservationDoc(ABC):
