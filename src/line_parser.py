@@ -1,7 +1,7 @@
 """A series of parsers."""
 
 # stdlib imports
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import Dict, List, Union, Callable, Generator, Tuple, Any
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -58,7 +58,9 @@ class LineParser(ABC):
         self.data_path = data_path
         self.chunks: Dict[str, str] = self._chunk()
 
+        self.data_lines: Dict[int, Dict[str, str | int]] = {}
         self._global_metadata: List["SensorThingsObject"] = []
+        self.observations: Dict[str, List["Observation"]] = {}
         self.raw_results = {}
         self.st_results = {}
 
@@ -79,18 +81,34 @@ class LineParser(ABC):
             description = lml.short_description
             chunks.update({description: data})
         return chunks
+    
+    @abstractmethod
+    def _find_data_lines(self) -> Dict[str, range]:
+        """Find line numbers where data begins.
 
-    def parse(self) -> Dict:
+        Use a regex specific to a format to find lines where data begins.
+
+        Returns:
+            A dict [str, int] where the keys are the data types and the range is the
+            range of lines for that given datatype.
+        """
         pass
 
-
-# Subparsers
-
+    @abstractmethod
+    def parse(self):
+        pass
 
 class CsimpV2(LineParser):
     """
     Parser for CSIMP V2 Observations.
     """
+    def __init__(self, 
+                 source_name: str, 
+                 data_path:Path, 
+                 line_map:"LineMap"
+                 ) -> None:
+        super().__init__(source_name, data_path, line_map)
+        self.trigger_time = self.trigger_time_subparser()
 
     def vol2_title_subparser(self) -> None:
         split = self.chunks["vol2_title"].split()
@@ -169,7 +187,7 @@ class CsimpV2(LineParser):
             )
         ]
 
-    def trigger_time_subparser(self) -> None:
+    def trigger_time_subparser(self) -> "datetime":
         split = self.chunks["trigger_time"].split()
         record_length = float(self.chunks["record_length"]) #TODO: #5 better handling of this.
         trigger_datetime = datetime.strptime(
@@ -183,6 +201,7 @@ class CsimpV2(LineParser):
                 "Datastream", "phenomenonTime", (trigger_datetime, trigger_datetime + timedelta(seconds=record_length))
             )
         ]
+        return trigger_datetime
 
     def station_number(self) -> None:
         station_number = int(self.chunks["station_number"])
@@ -495,6 +514,46 @@ class CsimpV2(LineParser):
                 },
             )
         ]
+    
+    def _find_data_lines(self) -> None:
+        """Find the lines which contain the data header (start line).
+
+        Returns:
+            Dict[str, ]
+        """
+        pattern = re.compile(r'(\d+)\s+points\s+of\s+(\w+)\s+data\s+equally\s+spaced\s+at\s+([\d.]+)\s+sec,\s+in\s+([\w/]+)')
+        with open(self.data_path) as f:
+            for i, l in enumerate(f):
+                if (search_result := pattern.search(l)):
+                    no_points = search_result.groups()[0]
+                    data_type = search_result.groups()[1]
+                    spacing = search_result.groups()[2]
+                    data_unit = search_result.groups()[3]
+                    self.data_lines.update({i:{'no_points':no_points,
+                                              'data_type':data_type,
+                                              'spacing':spacing,
+                                              'data_unit':data_unit}})
+
+    def observation_parse(self) -> None:
+        with open(self.data_path) as f:
+            content = f.readlines()
+            data_lines_idx = [i for i in self.data_lines.keys()]
+            for i in range(len(data_lines_idx)):
+                if i < len(data_lines_idx)-1:
+                    observations = content[data_lines_idx[i]+1:data_lines_idx[i+1]]
+                elif i >= len(data_lines_idx):
+                    observations = content[data_lines_idx[i]+1:]
+                data_type = self.data_lines[data_lines_idx[i]]['data_type']
+                spacing = self.data_lines[data_lines_idx[i]]['spacing']
+                self.observations.update({data_type: []})
+                result_time = self.trigger_time
+                for os in observations:
+                    os = os.rstrip()
+                    for i, o in enumerate([os[i:i+10] for i in range(0, len(os), 10)]):
+                        result_time = result_time + timedelta(seconds=float(spacing))
+                        self.observations[data_type] += [Observation(
+                            float(o.strip()), result_time)]
+                                                  
 
     def parse(self):
         self.vol2_title_subparser()
@@ -533,8 +592,8 @@ class CsimpV2(LineParser):
         self.value_and_time_pv_parse()
         self.val_and_time_pd_parse()
         self.initial_vel_and_displacement_parse()
-
-        # return values
+        self._find_data_lines()
+        self.observation_parse()
 
 
 # class ObservationDoc(ABC):
