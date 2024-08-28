@@ -81,7 +81,7 @@ class LineParser(ABC):
             description = lml.short_description
             chunks.update({description: data})
         return chunks
-    
+
     @abstractmethod
     def _find_data_lines(self) -> Dict[str, range]:
         """Find line numbers where data begins.
@@ -98,15 +98,13 @@ class LineParser(ABC):
     def parse(self):
         pass
 
+
 class CsimpV2(LineParser):
     """
     Parser for CSIMP V2 Observations.
     """
-    def __init__(self, 
-                 source_name: str, 
-                 data_path:Path, 
-                 line_map:"LineMap"
-                 ) -> None:
+
+    def __init__(self, source_name: str, data_path: Path, line_map: "LineMap") -> None:
         super().__init__(source_name, data_path, line_map)
         self.trigger_time = self.trigger_time_subparser()
 
@@ -116,9 +114,7 @@ class CsimpV2(LineParser):
         channel = split[5]
         self.raw_results.update({"Record ID": record_id, "Channel": channel})
         self._global_metadata += [
-            SensorThingsObject(
-                "Datastream", "properties", {"Record ID": record_id}
-            ),
+            SensorThingsObject("Datastream", "properties", {"Record ID": record_id}),
             SensorThingsObject("Observation", "parameters", {"Channel": channel}),
         ]
 
@@ -138,9 +134,11 @@ class CsimpV2(LineParser):
             SensorThingsObject(
                 "Datastream",
                 "properties",
-                {"Raw Data Processing Date": v1_process_date,
-                 "Raw Data Processed By": v1_processor,
-                 "Raw Data Internal Reference": v1_dir_ref},
+                {
+                    "Raw Data Processing Date": v1_process_date,
+                    "Raw Data Processed By": v1_processor,
+                    "Raw Data Internal Reference": v1_dir_ref,
+                },
             ),
         ]
 
@@ -189,7 +187,9 @@ class CsimpV2(LineParser):
 
     def trigger_time_subparser(self) -> "datetime":
         split = self.chunks["trigger_time"].split()
-        record_length = float(self.chunks["record_length"]) #TODO: #5 better handling of this.
+        record_length = float(
+            self.chunks["record_length"]
+        )  # TODO: #5 better handling of this.
         trigger_datetime = datetime.strptime(
             split[2].strip(",") + " " + split[3], "%m/%d/%y %H:%M:%S.%f"
         )
@@ -198,7 +198,9 @@ class CsimpV2(LineParser):
         self.raw_results.update({f"Trigger Datetime {timezone}": trigger_datetime})
         self._global_metadata += [
             SensorThingsObject(
-                "Datastream", "phenomenonTime", (trigger_datetime, trigger_datetime + timedelta(seconds=record_length))
+                "Datastream",
+                "phenomenonTime",
+                (trigger_datetime, trigger_datetime + timedelta(seconds=record_length)),
             )
         ]
         return trigger_datetime
@@ -514,46 +516,58 @@ class CsimpV2(LineParser):
                 },
             )
         ]
-    
+
     def _find_data_lines(self) -> None:
         """Find the lines which contain the data header (start line).
 
         Returns:
             Dict[str, ]
         """
-        pattern = re.compile(r'(\d+)\s+points\s+of\s+(\w+)\s+data\s+equally\s+spaced\s+at\s+([\d.]+)\s+sec,\s+in\s+([\w/]+)')
+        pattern = re.compile(
+            r"(\d+)\s+points\s+of\s+(\w+)\s+data\s+equally\s+spaced\s+at\s+([\d.]+)\s+sec,\s+in\s+([\w/]+)"
+        )
         with open(self.data_path) as f:
             for i, l in enumerate(f):
-                if (search_result := pattern.search(l)):
+                if search_result := pattern.search(l):
                     no_points = search_result.groups()[0]
                     data_type = search_result.groups()[1]
                     spacing = search_result.groups()[2]
                     data_unit = search_result.groups()[3]
-                    self.data_lines.update({i:{'no_points':no_points,
-                                              'data_type':data_type,
-                                              'spacing':spacing,
-                                              'data_unit':data_unit}})
+                    self.data_lines.update(
+                        {
+                            i: {
+                                "no_points": no_points,
+                                "data_type": data_type,
+                                "spacing": spacing,
+                                "data_unit": data_unit,
+                            }
+                        }
+                    )
 
     def observation_parse(self) -> None:
         with open(self.data_path) as f:
             content = f.readlines()
             data_lines_idx = [i for i in self.data_lines.keys()]
             for i in range(len(data_lines_idx)):
-                if i < len(data_lines_idx)-1:
-                    observations = content[data_lines_idx[i]+1:data_lines_idx[i+1]]
+                if i < len(data_lines_idx) - 1:
+                    observations = content[
+                        data_lines_idx[i] + 1 : data_lines_idx[i + 1]
+                    ]
                 elif i >= len(data_lines_idx):
-                    observations = content[data_lines_idx[i]+1:]
-                data_type = self.data_lines[data_lines_idx[i]]['data_type']
-                spacing = self.data_lines[data_lines_idx[i]]['spacing']
+                    observations = content[data_lines_idx[i] + 1 :]
+                data_type = self.data_lines[data_lines_idx[i]]["data_type"]
+                spacing = self.data_lines[data_lines_idx[i]]["spacing"]
                 self.observations.update({data_type: []})
                 result_time = self.trigger_time
                 for os in observations:
                     os = os.rstrip()
-                    for i, o in enumerate([os[i:i+10] for i in range(0, len(os), 10)]):
+                    for i, o in enumerate(
+                        [os[i : i + 10] for i in range(0, len(os), 10)]
+                    ):
                         result_time = result_time + timedelta(seconds=float(spacing))
-                        self.observations[data_type] += [Observation(
-                            float(o.strip()), result_time)]
-                                                  
+                        self.observations[data_type] += [
+                            Observation(float(o.strip()), result_time)
+                        ]
 
     def parse(self):
         self.vol2_title_subparser()
