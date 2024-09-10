@@ -2,7 +2,7 @@
 
 # stdlib imports
 from abc import ABC, abstractmethod
-from typing import Dict, List, Union, Callable, Generator, Tuple, Any
+from typing import Dict, List, Literal, Union, Callable, Generator, Tuple, Any
 from dataclasses import dataclass, field
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -61,6 +61,7 @@ class LineParser(ABC):
         self.data_lines: Dict[int, Dict[str, str | int]] = {}
         self._global_metadata: List["SensorThingsObject"] = []
         self.observations: Dict[str, List["Observation"]] = {}
+        self.observation_types: List[str] = []
         self.raw_results = {}
         self.st_results = {}
 
@@ -93,6 +94,19 @@ class LineParser(ABC):
             range of lines for that given datatype.
         """
         pass
+
+    def unpack_observations(self, data_type:str) -> Generator[Observation, None, None]:
+        """Unpack observations.
+
+        Args:
+            type (str): the data types available in this parser (reflected in the
+            observation_type attribute)
+        """
+        if data_type not in self.observation_types:
+            raise KeyError(f'Observation type not in observation_types: {self.observation_types}') 
+
+        for o in self.observations[data_type]:
+            yield o
 
     @abstractmethod
     def parse(self):
@@ -543,6 +557,7 @@ class CsimpV2(LineParser):
                             }
                         }
                     )
+                    self.observation_types.append(data_type)
 
     def observation_parse(self) -> None:
         with open(self.data_path) as f:
