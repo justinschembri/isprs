@@ -5,7 +5,7 @@ class Building():
         self.height = height
         self.latitude = lat
         self.longitude = long
-        self.period = period
+        self.period = period #TODO: #11 Implement natural period calculation.
         self.vs30 = vs30
 
     def ground(self) -> "Building":
