@@ -20,7 +20,7 @@ class GMPE(ABC):
         site_term: Type["SiteTerm"],
         fault_type: Optional[Literal["U", "SS", "NS", "RS"]],
         coefficients_table: Path,
-        coefficients_list: List[str],
+        coefficients_list: List[str],  # TODO: #12 check actual need for such an object.
     ) -> None:
         self.magnitude = magnitude
         self.distance = distance
@@ -33,7 +33,7 @@ class GMPE(ABC):
             coefficients_list=self.coefficients_list,
             magnitude=self.magnitude,
             building=self.building,
-            fault_type=self.fault_type
+            fault_type=self.fault_type,
         )
         self.path_term = path_term(
             coefficients_table=self.coefficients_table,
@@ -46,9 +46,8 @@ class GMPE(ABC):
             coefficient_table=self.coefficients_table,
             coefficients_list=self.coefficients_list,
             vs30=self.building.vs30,
-            building=self.building
+            building=self.building,
         )
-
 
     @abstractmethod
     def calculate(self) -> float:
@@ -73,7 +72,9 @@ class FunctionalTerm(ABC):
         self.building = building
         self._coefficients_table = coefficients_table
         self.coefficients_list = coefficients_list
-        self.coefficients: Dict[str, float | int] = self._coefficients_lookup(self.coefficients_list)
+        self._coefficients: Dict[str, float | int] = self._coefficients_lookup(
+            self.coefficients_list
+        )
 
     def _coefficients_lookup(self, lookup: List[Tuple[str]]) -> Dict:
         with open(self._coefficients_table, "r") as f:
@@ -109,12 +110,14 @@ class PathTerm(FunctionalTerm):
         building ("building"): building under examination.
     """
 
-    def __init__(self, 
-                 coefficients_table: Path, 
-                 coefficients_list: List[str], 
-                 building: Building, 
-                 magnitude:float, 
-                 distance:float) -> None:
+    def __init__(
+        self,
+        coefficients_table: Path,
+        coefficients_list: List[str],
+        building: Building,
+        magnitude: float,
+        distance: float,
+    ) -> None:
         super().__init__(coefficients_table, coefficients_list, building)
         self.magnitude = magnitude
         self.distance = distance
@@ -130,11 +133,13 @@ class EventTerm(FunctionalTerm):
         building ("building"): building under examination.
     """
 
-    def __init__(self, 
-                 coefficients_table: Path, 
-                 coefficients_list: List[str], 
-                 building: Building,
-                 magnitude: float) -> None:
+    def __init__(
+        self,
+        coefficients_table: Path,
+        coefficients_list: List[str],
+        building: Building,
+        magnitude: float,
+    ) -> None:
         super().__init__(coefficients_table, coefficients_list, building)
         self.magnitude = magnitude
 

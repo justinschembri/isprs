@@ -23,3 +23,6 @@ class TestGMPEInstantiation(unittest.TestCase):
             coefficients_list=['c1', 'c2', 'c3', 'c4', 'c5'],
         )
         self.assertIsInstance(gmpe, BSSA13GMPE)
+
+if __name__ == "__main__":
+    unittest.main()
