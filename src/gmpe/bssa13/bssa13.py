@@ -66,16 +66,16 @@ class BSSA13PathTerm(PathTerm):
             coefficients_table, coefficients_list, building, magnitude, distance
         )
         # Required arguments
-        coefficient_keys = ["c1", "c2", "c3", "h", "mref", "rref"]
+        coefficient_keys = ["c1", "c2", "c3", "mref", "rref", "h" ]
         self._coefficients = self._coefficients_lookup(
             [(i, self.building.period) for i in coefficient_keys]
         )
         self._c1 = self._coefficients["c1"]
         self._c2 = self._coefficients["c2"]
         self._c3 = self._coefficients["c3"]
-        self._h = self._coefficients["h"]
         self._mref = self._coefficients["mref"]
         self._rref = self._coefficients["rref"]
+        self._h = self._coefficients["h"]
         self._magnitude = magnitude
         self._rjb = distance
 
@@ -98,22 +98,22 @@ class BSSA13EventTerm(EventTerm):
         fault_type: Literal["U"] | Literal["SS"] | Literal["NS"] | Literal["RS"],
     ) -> None:
         super().__init__(coefficients_table, coefficients_list, building, magnitude)
-        self.fault_type = fault_type
+        self._fault_type = fault_type
         # Requirement arguments
         coefficient_keys = ["e0", "e1", "e2", "e3", "e4", "e5", "e6", "Mh"]
         self._coefficients = self._coefficients_lookup(
             [(i, self.building.period) for i in coefficient_keys]
         )
-        self.e0 = self._coefficients["e0"]
-        self.e1 = self._coefficients["e1"]
-        self.e2 = self._coefficients["e2"]
-        self.e3 = self._coefficients["e3"]
-        self.e4 = self._coefficients["e4"]
-        self.e5 = self._coefficients["e5"]
-        self.e6 = self._coefficients["e6"]
-        self.Mh = self._coefficients["Mh"]
-        self.fault_type = fault_type
-        self.magnitude = magnitude
+        self._e0 = self._coefficients["e0"]
+        self._e1 = self._coefficients["e1"]
+        self._e2 = self._coefficients["e2"]
+        self._e3 = self._coefficients["e3"]
+        self._e4 = self._coefficients["e4"]
+        self._e5 = self._coefficients["e5"]
+        self._e6 = self._coefficients["e6"]
+        self._Mh = self._coefficients["Mh"]
+        self._fault_type = fault_type
+        self._magnitude = magnitude
 
     def calculate(self) -> float:
         dummy_vars = {
@@ -122,23 +122,23 @@ class BSSA13EventTerm(EventTerm):
             "NS": [0, 0, 1, 0],
             "RS": [0, 0, 0, 1],
         }
-        U, SS, NS, RS = dummy_vars[self.fault_type]
-        if self.magnitude <= self.Mh:
+        U, SS, NS, RS = dummy_vars[self._fault_type]
+        if self._magnitude <= self._Mh:
             return (
-                self.e0
-                + (self.e1 * SS)
-                + (self.e2 * NS)
-                + (self.e3 * RS)
-                + (self.e4 * (self.magnitude - self.Mh))
-                + (self.e5 * ((self.magnitude - self.Mh) ** 2))
+                self._e0
+                + (self._e1 * SS)
+                + (self._e2 * NS)
+                + (self._e3 * RS)
+                + (self._e4 * (self._magnitude - self._Mh))
+                + (self._e5 * ((self._magnitude - self._Mh) ** 2))
             )
-        elif self.magnitude > self.Mh:
+        elif self._magnitude > self._Mh:
             return (
-                (self.e0 * U)
-                + (self.e1 * SS)
-                + (self.e2 * NS)
-                + (self.e3 * RS)
-                + self.e6*(self.magnitude - self.Mh)
+                (self._e0 * U)
+                + (self._e1 * SS)
+                + (self._e2 * NS)
+                + (self._e3 * RS)
+                + self._e6*(self._magnitude - self._Mh)
             )
 
 
