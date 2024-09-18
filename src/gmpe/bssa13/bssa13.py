@@ -138,7 +138,7 @@ class BSSA13EventTerm(EventTerm):
                 + (self.e1 * SS)
                 + (self.e2 * NS)
                 + (self.e3 * RS)
-                + self.e6(self.magnitude - self.Mh)
+                + self.e6*(self.magnitude - self.Mh)
             )
 
 
