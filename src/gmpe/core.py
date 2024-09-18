@@ -1,7 +1,7 @@
 # stdlib imports
 import json
 from pathlib import Path
-from typing import List, Protocol, Dict, Tuple, Type, Literal, Optional, Union
+from typing import Any, List, Protocol, Dict, Tuple, Type, Literal, Optional, Union
 from abc import ABC, abstractmethod
 
 # external imports
@@ -28,26 +28,36 @@ class GMPE(ABC):
         self.coefficients_table = coefficients_table
         self.coefficients_list = coefficients_list
         self.fault_type = fault_type
-        self.event_term = event_term(
+        self.event_function = event_term
+        self.path_function = path_term
+        self.site_function = site_term
+
+    def _instantiate_functional_terms(self) -> None:
+        self.event_term = self.event_function(
             coefficients_table=self.coefficients_table,
             coefficients_list=self.coefficients_list,
             magnitude=self.magnitude,
             building=self.building,
             fault_type=self.fault_type,
         )
-        self.path_term = path_term(
+        self.path_term = self.path_function(
             coefficients_table=self.coefficients_table,
             coefficients_list=self.coefficients_list,
             magnitude=self.magnitude,
             distance=self.distance,
             building=self.building,
         )
-        self.site_term = site_term(
+        self.site_term = self.site_function(
             coefficient_table=self.coefficients_table,
             coefficients_list=self.coefficients_list,
             vs30=self.building.vs30,
             building=self.building,
         )
+
+    def _change_attribute(self, obj: object, name: str, value: Any) -> None:
+        setattr(self, name, value)
+        self._instantiate_functional_terms()
+        # TODO: #14 check how well this integrates.
 
     @abstractmethod
     def calculate(self) -> float:
