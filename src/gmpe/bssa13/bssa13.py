@@ -66,7 +66,7 @@ class BSSA13PathTerm(PathTerm):
             coefficients_table, coefficients_list, building, magnitude, distance
         )
         # Required arguments
-        coefficient_keys = ["c1", "c2", "c3", "mref", "rref", "h" ]
+        coefficient_keys = ["c1", "c2", "c3", "mref", "rref", "h"]
         self._coefficients = self._coefficients_lookup(
             [(i, self.building.period) for i in coefficient_keys]
         )
@@ -138,7 +138,7 @@ class BSSA13EventTerm(EventTerm):
                 + (self._e1 * SS)
                 + (self._e2 * NS)
                 + (self._e3 * RS)
-                + self._e6*(self._magnitude - self._Mh)
+                + self._e6 * (self._magnitude - self._Mh)
             )
 
 
@@ -159,13 +159,13 @@ class BSSA13SiteTerm(SiteTerm):
             pga_r=pga_r,
             building=building,
         )
-        coefficient_keys = ["c", "vref", "vc", "f1", "f3", "f4", "f5"]
+        coefficient_keys = ["c", "vc", "vref", "f1", "f3", "f4", "f5"]
         self._coefficients = self._coefficients_lookup(
             [(i, self.building.period) for i in coefficient_keys]
         )
         self._c = self._coefficients["c"]  # type: float
-        self._vref = self._coefficients["vref"]  # type: float
         self._vc = self._coefficients["vc"]  # type: float
+        self._vref = self._coefficients["vref"]  # type: float
         self._f1 = self._coefficients["f1"]
         self._f3 = self._coefficients["f3"]
         self._f4 = self._coefficients["f4"]
