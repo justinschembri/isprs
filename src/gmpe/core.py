@@ -31,6 +31,7 @@ class GMPE(ABC):
         self.event_function = event_term
         self.path_function = path_term
         self.site_function = site_term
+        self._instantiate_functional_terms()
 
     def _instantiate_functional_terms(self) -> None:
         self.event_term = self.event_function(
