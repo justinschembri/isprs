@@ -2,6 +2,7 @@
 from pathlib import Path
 import numpy as np
 from typing import Dict, List, Literal, Type, Optional
+import copy
 
 # external imports
 
@@ -42,6 +43,7 @@ class BSSA13GMPE(GMPE):
             "pga_r", (self.event_term.calculate() + self.path_term.calculate())
         )
         self.building.__setattr__("period", period)
+        #TODO: #17 Messy implementation.
 
     def calculate(self) -> float:
         self._calculate_unamplified_pga()
@@ -159,7 +161,8 @@ class BSSA13SiteTerm(SiteTerm):
             pga_r=pga_r,
             building=building,
         )
-        coefficient_keys = ["c", "vc", "vref", "f1", "f3", "f4", "f5"]
+        #TODO: #16 This could be a class attribute:
+        coefficient_keys = ["c", "vc", "vref", "f1", "f3", "f4", "f5"] 
         self._coefficients = self._coefficients_lookup(
             [(i, self.building.period) for i in coefficient_keys]
         )
@@ -173,20 +176,24 @@ class BSSA13SiteTerm(SiteTerm):
         self._vs30 = vs30  # type: float
         self.pga_r = None
         self._f2 = self.f2_calculate()
+        self._linear_component = self._calculate_linear_component()
+    
+    def set_pga_r(self, pga_r:float) -> None:
+        setattr(self, "pga_r", pga_r)
 
     def f2_calculate(self) -> float:
-        vs30_exponent = self._f5 * (min(self._vs30, 760) - 350)
+        vs30_exponent = self._f5 * (min(self._vs30, 760) - 360)
         f5_exponent = self._f5 * (760 - 360)
         return self._f4 * (np.exp(vs30_exponent) - np.exp(f5_exponent))
 
-    def calculate(self) -> float:
-        def _linear_component() -> float:
-            if self._vs30 <= self._vc:
-                return self._c * np.log((self._vs30 / self._vref))
-            elif self._vs30 > self._vc:
-                return self._c * np.log((self._vc / self._vref))
+    def _calculate_linear_component(self) -> float:
+        if self._vs30 <= self._vc:
+            return self._c * np.log((self._vs30 / self._vref))
+        elif self._vs30 > self._vc:
+            return self._c * np.log((self._vc / self._vref))
 
-        def _nonlinear_component() -> float:
+    def calculate(self) -> float:
+        def _calculate_nonlinear_component() -> float:
             return self._f1 + (self._f2 * np.log((self.pga_r + self._f3) / self._f3))
 
-        return _linear_component() + _nonlinear_component()
+        return self._linear_component + _calculate_nonlinear_component()
