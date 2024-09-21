@@ -95,7 +95,7 @@ class LineParser(ABC):
         """
         pass
 
-    def unpack_observations(self, data_type:str) -> Generator[Observation, None, None]:
+    def unpack_observations(self, data_type: str) -> Generator[Observation, None, None]:
         """Unpack observations.
 
         Args:
@@ -103,7 +103,9 @@ class LineParser(ABC):
             observation_type attribute)
         """
         if data_type not in self.observation_types:
-            raise KeyError(f'Observation type not in observation_types: {self.observation_types}') 
+            raise KeyError(
+                f"Observation type not in observation_types: {self.observation_types}"
+            )
 
         for o in self.observations[data_type]:
             yield o
