@@ -27,7 +27,7 @@ class TestBSSA13GMPEBasicFunctionality(unittest.TestCase):
             path_term=BSSA13PathTerm,
             site_term=BSSA13SiteTerm,
             fault_type="U",
-            coefficients_table="src/gmpe/bssa13/coefficients.json",
+            coefficients_table="src/gmpe/coefficients/bssa13.json",
             coefficients_list=["c1", "c2", "c3", "c4", "c5"],
         )
 
