@@ -62,11 +62,13 @@ class Datastream:
 @dataclass
 class Observation:
     result: Any | None
-    resultTime: datetime | None 
+    resultTime: datetime | None
     phenomenonTime: datetime | None = None
     validTime: datetime | None = None
-    resultQuality: Any | None = None # check about this
-    parameters: Dict[str, Any] | None = None# could potentially be a JSON object class.
+    resultQuality: Any | None = None  # check about this
+    parameters: Dict[str, Any] | None = (
+        None  # could potentially be a JSON object class.
+    )
 
 
 @dataclass

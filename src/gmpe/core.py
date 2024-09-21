@@ -55,7 +55,7 @@ class GMPE(ABC):
             building=self.building,
         )
 
-    def _change_attribute(self, obj: object, name: str, value: Any) -> None:
+    def _change_attribute(self, name: str, value: Any) -> None:
         setattr(self, name, value)
         self._instantiate_functional_terms()
         # TODO: #14 check how well this integrates.

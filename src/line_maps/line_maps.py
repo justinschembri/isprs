@@ -10,7 +10,7 @@ class LineMapLine:
     Information model for a line from a linemap.
 
     A linemap is a set of integer and string descriptions which define what content is
-    found at which line and within which column of some text based observation file. 
+    found at which line and within which column of some text based observation file.
     Example:
 
     ```
@@ -42,8 +42,10 @@ class LineMapLine:
         if self.column_start > self.column_end:
             raise ValueError(f"Column start must be greater than column finish.")
         self.line_map_line = {
-            self.line: 
-                (range(self.column_start, self.column_end), self.short_description)
+            self.line: (
+                range(self.column_start, self.column_end),
+                self.short_description,
+            )
         }
 
     def __repr__(self):

@@ -2,6 +2,7 @@
 from pathlib import Path
 import numpy as np
 from typing import Dict, List, Literal, Type, Optional
+import copy
 
 # external imports
 
@@ -16,9 +17,9 @@ class BSSA13GMPE(GMPE):
         building: Building,
         magnitude: float,
         distance: float,
-        event_term: Type[EventTerm],
-        path_term: Type[PathTerm],
-        site_term: Type[SiteTerm],
+        event_term: "BSSA13EventTerm",
+        path_term: "BSSA13PathTerm",
+        site_term: "BSSA13SiteTerm",
         fault_type: None | Literal["U"] | Literal["SS"] | Literal["NS"] | Literal["RS"],
         coefficients_table: Path,
         coefficients_list: List[str],
@@ -36,12 +37,18 @@ class BSSA13GMPE(GMPE):
         )
 
     def _calculate_unamplified_pga(self):
-        period = self.building.period
-        self.building.__setattr__("period", 0)
-        self.site_term.__setattr__(
-            "pga_r", (self.event_term.calculate() + self.path_term.calculate())
+        actual_building = copy.copy(self.building)
+        self._change_attribute("building", self.building.ground())
+        pga_r = np.exp(
+            self.event_term.calculate()
+            + self.path_term.calculate()
+            + self.site_term._linear_component
         )
-        self.building.__setattr__("period", period)
+        # revert back to original building:
+        self._change_attribute("building", actual_building)
+        self.site_term.set_pga_r(pga_r)
+
+        # TODO: #17 Messy implementation.
 
     def calculate(self) -> float:
         self._calculate_unamplified_pga()
@@ -66,16 +73,16 @@ class BSSA13PathTerm(PathTerm):
             coefficients_table, coefficients_list, building, magnitude, distance
         )
         # Required arguments
-        coefficient_keys = ["c1", "c2", "c3", "h", "mref", "rref"]
+        coefficient_keys = ["c1", "c2", "c3", "mref", "rref", "h"]
         self._coefficients = self._coefficients_lookup(
             [(i, self.building.period) for i in coefficient_keys]
         )
         self._c1 = self._coefficients["c1"]
         self._c2 = self._coefficients["c2"]
         self._c3 = self._coefficients["c3"]
-        self._h = self._coefficients["h"]
         self._mref = self._coefficients["mref"]
         self._rref = self._coefficients["rref"]
+        self._h = self._coefficients["h"]
         self._magnitude = magnitude
         self._rjb = distance
 
@@ -98,22 +105,22 @@ class BSSA13EventTerm(EventTerm):
         fault_type: Literal["U"] | Literal["SS"] | Literal["NS"] | Literal["RS"],
     ) -> None:
         super().__init__(coefficients_table, coefficients_list, building, magnitude)
-        self.fault_type = fault_type
+        self._fault_type = fault_type
         # Requirement arguments
         coefficient_keys = ["e0", "e1", "e2", "e3", "e4", "e5", "e6", "Mh"]
         self._coefficients = self._coefficients_lookup(
             [(i, self.building.period) for i in coefficient_keys]
         )
-        self.e0 = self._coefficients["e0"]
-        self.e1 = self._coefficients["e1"]
-        self.e2 = self._coefficients["e2"]
-        self.e3 = self._coefficients["e3"]
-        self.e4 = self._coefficients["e4"]
-        self.e5 = self._coefficients["e5"]
-        self.e6 = self._coefficients["e6"]
-        self.Mh = self._coefficients["Mh"]
-        self.fault_type = fault_type
-        self.magnitude = magnitude
+        self._e0 = self._coefficients["e0"]
+        self._e1 = self._coefficients["e1"]
+        self._e2 = self._coefficients["e2"]
+        self._e3 = self._coefficients["e3"]
+        self._e4 = self._coefficients["e4"]
+        self._e5 = self._coefficients["e5"]
+        self._e6 = self._coefficients["e6"]
+        self._Mh = self._coefficients["Mh"]
+        self._fault_type = fault_type
+        self._magnitude = magnitude
 
     def calculate(self) -> float:
         dummy_vars = {
@@ -122,23 +129,23 @@ class BSSA13EventTerm(EventTerm):
             "NS": [0, 0, 1, 0],
             "RS": [0, 0, 0, 1],
         }
-        U, SS, NS, RS = dummy_vars[self.fault_type]
-        if self.magnitude <= self.Mh:
+        U, SS, NS, RS = dummy_vars[self._fault_type]
+        if self._magnitude <= self._Mh:
             return (
-                self.e0
-                + (self.e1 * SS)
-                + (self.e2 * NS)
-                + (self.e3 * RS)
-                + (self.e4 * (self.magnitude - self.Mh))
-                + (self.e5 * ((self.magnitude - self.Mh) ** 2))
+                self._e0
+                + (self._e1 * SS)
+                + (self._e2 * NS)
+                + (self._e3 * RS)
+                + (self._e4 * (self._magnitude - self._Mh))
+                + (self._e5 * ((self._magnitude - self._Mh) ** 2))
             )
-        elif self.magnitude > self.Mh:
+        elif self._magnitude > self._Mh:
             return (
-                (self.e0 * U)
-                + (self.e1 * SS)
-                + (self.e2 * NS)
-                + (self.e3 * RS)
-                + self.e6(self.magnitude - self.Mh)
+                (self._e0 * U)
+                + (self._e1 * SS)
+                + (self._e2 * NS)
+                + (self._e3 * RS)
+                + self._e6 * (self._magnitude - self._Mh)
             )
 
 
@@ -159,13 +166,14 @@ class BSSA13SiteTerm(SiteTerm):
             pga_r=pga_r,
             building=building,
         )
-        coefficient_keys = ["c", "vref", "vc", "f1", "f3", "f4", "f5"]
+        # TODO: #16 This could be a class attribute:
+        coefficient_keys = ["c", "vc", "vref", "f1", "f3", "f4", "f5"]
         self._coefficients = self._coefficients_lookup(
             [(i, self.building.period) for i in coefficient_keys]
         )
         self._c = self._coefficients["c"]  # type: float
-        self._vref = self._coefficients["vref"]  # type: float
         self._vc = self._coefficients["vc"]  # type: float
+        self._vref = self._coefficients["vref"]  # type: float
         self._f1 = self._coefficients["f1"]
         self._f3 = self._coefficients["f3"]
         self._f4 = self._coefficients["f4"]
@@ -173,20 +181,28 @@ class BSSA13SiteTerm(SiteTerm):
         self._vs30 = vs30  # type: float
         self.pga_r = None
         self._f2 = self.f2_calculate()
+        self._linear_component = self._calculate_linear_component()
+
+    def set_pga_r(self, pga_r: float) -> None:
+        setattr(self, "pga_r", pga_r)
 
     def f2_calculate(self) -> float:
-        vs30_exponent = self._f5 * (min(self._vs30, 760) - 350)
+        vs30_exponent = self._f5 * (min(self._vs30, 760) - 360)
         f5_exponent = self._f5 * (760 - 360)
         return self._f4 * (np.exp(vs30_exponent) - np.exp(f5_exponent))
 
+    def _calculate_linear_component(self) -> float:
+        if self._vs30 <= self._vc:
+            return self._c * np.log((self._vs30 / self._vref))
+        elif self._vs30 > self._vc:
+            return self._c * np.log((self._vc / self._vref))
+
+    def _calculate_nonlinear_component(self) -> float:
+        if not self.pga_r:
+            raise AttributeError(
+                "PGA(rock) has not been calculated. This is an internal method."
+            )
+        return self._f1 + (self._f2 * np.log((self.pga_r + self._f3) / self._f3))
+
     def calculate(self) -> float:
-        def _linear_component() -> float:
-            if self._vs30 <= self._vc:
-                return self._c * np.log((self._vs30 / self._vref))
-            elif self._vs30 > self._vc:
-                return self._c * np.log((self._vc / self._vref))
-
-        def _nonlinear_component() -> float:
-            return self._f1 + (self._f2 * np.log((self.pga_r + self._f3) / self._f3))
-
-        return _linear_component() + _nonlinear_component()
+        return self._linear_component + self._calculate_nonlinear_component()
