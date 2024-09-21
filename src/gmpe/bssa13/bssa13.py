@@ -17,9 +17,9 @@ class BSSA13GMPE(GMPE):
         building: Building,
         magnitude: float,
         distance: float,
-        event_term: Type[EventTerm],
-        path_term: Type[PathTerm],
-        site_term: Type[SiteTerm],
+        event_term: "BSSA13EventTerm",
+        path_term: "BSSA13PathTerm",
+        site_term: "BSSA13SiteTerm",
         fault_type: None | Literal["U"] | Literal["SS"] | Literal["NS"] | Literal["RS"],
         coefficients_table: Path,
         coefficients_list: List[str],
@@ -37,13 +37,18 @@ class BSSA13GMPE(GMPE):
         )
 
     def _calculate_unamplified_pga(self):
-        period = self.building.period
-        self.building.__setattr__("period", 0)
-        self.site_term.__setattr__(
-            "pga_r", (self.event_term.calculate() + self.path_term.calculate())
+        actual_building = copy.copy(self.building)
+        self._change_attribute("building", self.building.ground())
+        pga_r = np.exp(
+            self.event_term.calculate()
+            + self.path_term.calculate()
+            + self.site_term._linear_component
         )
-        self.building.__setattr__("period", period)
-        #TODO: #17 Messy implementation.
+        # revert back to original building:
+        self._change_attribute("building", actual_building)
+        self.site_term.set_pga_r(pga_r)
+
+        # TODO: #17 Messy implementation.
 
     def calculate(self) -> float:
         self._calculate_unamplified_pga()
@@ -161,8 +166,8 @@ class BSSA13SiteTerm(SiteTerm):
             pga_r=pga_r,
             building=building,
         )
-        #TODO: #16 This could be a class attribute:
-        coefficient_keys = ["c", "vc", "vref", "f1", "f3", "f4", "f5"] 
+        # TODO: #16 This could be a class attribute:
+        coefficient_keys = ["c", "vc", "vref", "f1", "f3", "f4", "f5"]
         self._coefficients = self._coefficients_lookup(
             [(i, self.building.period) for i in coefficient_keys]
         )
@@ -177,8 +182,8 @@ class BSSA13SiteTerm(SiteTerm):
         self.pga_r = None
         self._f2 = self.f2_calculate()
         self._linear_component = self._calculate_linear_component()
-    
-    def set_pga_r(self, pga_r:float) -> None:
+
+    def set_pga_r(self, pga_r: float) -> None:
         setattr(self, "pga_r", pga_r)
 
     def f2_calculate(self) -> float:
@@ -191,9 +196,11 @@ class BSSA13SiteTerm(SiteTerm):
             return self._c * np.log((self._vs30 / self._vref))
         elif self._vs30 > self._vc:
             return self._c * np.log((self._vc / self._vref))
+        
 
+    def _calculate_nonlinear_component(self) -> float:
+        return self._f1 + (self._f2 * np.log((self.pga_r + self._f3) / self._f3))
+    
+    
     def calculate(self) -> float:
-        def _calculate_nonlinear_component() -> float:
-            return self._f1 + (self._f2 * np.log((self.pga_r + self._f3) / self._f3))
-
-        return self._linear_component + _calculate_nonlinear_component()
+        return self._linear_component + self._calculate_nonlinear_component()

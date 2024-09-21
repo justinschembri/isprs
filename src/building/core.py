@@ -12,5 +12,6 @@ class Building():
         return Building(height=self.height,
                          lat = self.latitude,
                          long = self.longitude,
-                         period=0)
+                         period=0,
+                         vs30=760)
 
