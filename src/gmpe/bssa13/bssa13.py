@@ -196,11 +196,13 @@ class BSSA13SiteTerm(SiteTerm):
             return self._c * np.log((self._vs30 / self._vref))
         elif self._vs30 > self._vc:
             return self._c * np.log((self._vc / self._vref))
-        
 
     def _calculate_nonlinear_component(self) -> float:
+        if not self.pga_r:
+            raise AttributeError(
+                "PGA(rock) has not been calculated. This is an internal method."
+            )
         return self._f1 + (self._f2 * np.log((self.pga_r + self._f3) / self._f3))
-    
-    
+
     def calculate(self) -> float:
         return self._linear_component + self._calculate_nonlinear_component()
