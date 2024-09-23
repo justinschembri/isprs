@@ -15,7 +15,7 @@ from line_maps.line_maps import LineMapLine, LineMap
 import pytz
 
 # project imports
-from src.sensor_things.model import (
+from models.sensorThings import (
     Sensor,
     ObservedProperty,
     Datastream,
