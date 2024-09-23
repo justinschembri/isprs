@@ -12,29 +12,27 @@ class Building(ABC):
     Building is an abstract base class (ABC) representing a building.
 
     Attributes:
-        height (int | float): The height (metres) of the building.
-        latitude (float): The latitude coordinate of the building.
-        longitude (float): The longitude coordinate of the building.
-        vs30 (float): The average shear-wave velocity in the top 30 meters of the soil.
-        period (float): The fundamental period of the building, initialized later.
+        lat (float): The latitude coordinate of the building.
+        long (float): The longitude coordinate of the building.
+        seismic_properties (Optional[SeismicProperties]): The seismic properties of the
+            building, including details such as height and vs30 (average shear-wave
+            velocity in the top 30 meters of the soil).
 
     Methods:
         ground() -> Building:
-            Returns a new Building instance with default ground conditions (period = 0),
-            used to calculate spectral acceleration.
+            Returns a new Building instance with ground seismic properties, where period
+            is set to 0 and vs30 is set to 760 m/s (default ground condition).
+            This method is used to calculate spectral acceleration.
     """
 
-    # height: int | float
-    lat: float
-    long: float
+    latitude: float
+    longitude: float
     seismic_properties: Optional["SeismicProperties"]
-    # vs30: Optional[float] = None
-    # period: Optional[float] = None
 
     def ground(self) -> "Building":
         return Building(
-            lat=self.lat,
-            long=self.long,
+            latitude=self.latitude,
+            longitude=self.longitude,
             seismic_properties=SeismicProperties(
                 period=0, vs30=760, height=self.seismic_properties.properties["height"]
             ),
@@ -42,6 +40,20 @@ class Building(ABC):
 
 
 class SeismicProperties:
+    """
+    Container class for seismic properties of a building.
+
+    Attributes:
+        period (Optional[int | float]): The fundamental period of the building, which
+            can either be provided directly or calculated using a provided function.
+        period_function (Optional[Callable[..., int | float]]): Pass a function to
+            calculate the building's period from other passed properties.
+        **kwargs: any seismic properties (e.g. height, vs30, structure type ...)
+
+    Instantiation:
+        if no period arg is passed, will calculate it from the passed period_function
+        and other passed properties.
+    """
 
     def __init__(
         self,
@@ -53,16 +65,21 @@ class SeismicProperties:
         self.period_function = period_function
         self.properties = kwargs
 
-        if not self.period and self.period_function:
-            self.period = self.period_function(**self.kwargs)
+        if self.period == None and self.period_function:
+            self.period = self.period_function(**self.properties)
+
+        if self.period == None and not self.period_function:
+            raise ValueError(
+                "Pass building period or function to calculate it from passed kwargs."
+            )
 
 
 def calculate_asce_period(
-    *,
     structure_type: Literal[
         "Steel MRF", "Concrete MRF", "Eccentrically braced SF", "Other systems"
     ],
-    height: Union[int, float]
+    height: Union[int, float],
+    **kwargs
 ) -> float:
     """Calculate the natural period using ASCE7-10 methodology (equation 12.8-7).
 

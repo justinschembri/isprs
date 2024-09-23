@@ -1,3 +1,5 @@
+"""Tests for the GMPE module."""
+
 # std library imports
 from unittest import TestCase
 
@@ -18,7 +20,9 @@ class TestBSSA13GMPEBasicFunctionality(TestCase):
 
     def setUp(self) -> None:
         seismic_properties = SeismicProperties(height=20, period=1, vs30=350)
-        building = Building(lat=100, long=200, seismic_properties=seismic_properties)
+        building = Building(
+            latitude=100, longitude=200, seismic_properties=seismic_properties
+        )
         self.gmpe = BSSA13GMPE(
             building=building,
             magnitude=5,

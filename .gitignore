@@ -173,3 +173,6 @@ cython_debug/
 # VS code
 
 .vscode
+
+# pytest-cov
+lcov.info
