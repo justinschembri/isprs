@@ -51,7 +51,7 @@ class GMPE(ABC):
         self.site_term = self.site_function(
             coefficient_table=self.coefficients_table,
             coefficients_list=self.coefficients_list,
-            vs30=self.building.vs30,
+            vs30=self.building.seismic_properties.properties["vs30"],
             building=self.building,
         )
 
@@ -87,6 +87,7 @@ class FunctionalTerm(ABC):
             self.coefficients_list
         )
 
+    # TODO: #19 Extract as a utility function.
     def _coefficients_lookup(self, lookup: List[Tuple[str]]) -> Dict:
         with open(self._coefficients_table, "r") as f:
             data = json.load(f)

@@ -1,0 +1,26 @@
+{
+    "source": "ASCE 7-10",
+    "equation": "12.8.-7",
+    "usage": "Estimate natural period of a structure.",
+    "latex_repr": "T_a = C_t h_n^x",
+    "units": {"h":"metres"},
+    "reference": "...",
+    "coefficients": {
+        "Steel MRF": {
+            "Ct": 0.0724,
+            "x": 0.8
+        },
+        "Concrete MRF": {
+            "Ct": 0.0466,
+            "x": 0.9
+        },
+        "Eccentrically braced SF": {
+            "Ct": 0.0731,
+            "x": 0.75
+        },
+        "Other systems": {
+            "Ct": 0.0488,
+            "x": 0.75
+        }
+    }
+}

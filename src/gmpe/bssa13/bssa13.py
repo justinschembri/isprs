@@ -75,7 +75,7 @@ class BSSA13PathTerm(PathTerm):
         # Required arguments
         coefficient_keys = ["c1", "c2", "c3", "mref", "rref", "h"]
         self._coefficients = self._coefficients_lookup(
-            [(i, self.building.period) for i in coefficient_keys]
+            [(i, self.building.seismic_properties.period) for i in coefficient_keys]
         )
         self._c1 = self._coefficients["c1"]
         self._c2 = self._coefficients["c2"]
@@ -109,7 +109,7 @@ class BSSA13EventTerm(EventTerm):
         # Requirement arguments
         coefficient_keys = ["e0", "e1", "e2", "e3", "e4", "e5", "e6", "Mh"]
         self._coefficients = self._coefficients_lookup(
-            [(i, self.building.period) for i in coefficient_keys]
+            [(i, self.building.seismic_properties.period) for i in coefficient_keys]
         )
         self._e0 = self._coefficients["e0"]
         self._e1 = self._coefficients["e1"]
@@ -169,7 +169,7 @@ class BSSA13SiteTerm(SiteTerm):
         # TODO: #16 This could be a class attribute:
         coefficient_keys = ["c", "vc", "vref", "f1", "f3", "f4", "f5"]
         self._coefficients = self._coefficients_lookup(
-            [(i, self.building.period) for i in coefficient_keys]
+            [(i, self.building.seismic_properties.period) for i in coefficient_keys]
         )
         self._c = self._coefficients["c"]  # type: float
         self._vc = self._coefficients["vc"]  # type: float

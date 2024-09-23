@@ -1,9 +1,9 @@
 # standard library imports:
 from dataclasses import dataclass, field
-from abc import ABC
+from abc import ABC, abstractmethod
 import json
 from pathlib import Path
-from typing import Literal
+from typing import Any, Callable, Literal, Optional, Union
 
 
 @dataclass
@@ -24,54 +24,64 @@ class Building(ABC):
             used to calculate spectral acceleration.
     """
 
-    height: int | float
-    latitude: float
-    longitude: float
-    vs30: float
-    period: float = field(init=False)
+    # height: int | float
+    lat: float
+    long: float
+    seismic_properties: Optional["SeismicProperties"]
+    # vs30: Optional[float] = None
+    # period: Optional[float] = None
 
     def ground(self) -> "Building":
         return Building(
-            height=self.height,
-            latitude=self.latitude,
-            longitude=self.longitude,
-            period=0,
-            vs30=760,
+            lat=self.lat,
+            long=self.long,
+            seismic_properties=SeismicProperties(
+                period=0, vs30=760, height=self.seismic_properties.properties["height"]
+            ),
         )
 
 
-@dataclass
-class ASCEBuilding(Building):
-    """
-    ASCEBuilding is a subclass of Building with its natural period calculated using
-    the ASCE7-10 methodology (equation 12.8.-7)
+class SeismicProperties:
 
-    Attributes:
-        coefficients_table (Path): Path to JSON file containing model coefficients.
+    def __init__(
+        self,
+        period: Optional[Union[int, float]] = None,
+        period_function: Optional[Callable[..., Union[int, float]]] = None,
+        **kwargs
+    ):
+        self.period = period
+        self.period_function = period_function
+        self.properties = kwargs
+
+        if not self.period and self.period_function:
+            self.period = self.period_function(**self.kwargs)
+
+
+def calculate_asce_period(
+    *,
+    structure_type: Literal[
+        "Steel MRF", "Concrete MRF", "Eccentrically braced SF", "Other systems"
+    ],
+    height: Union[int, float]
+) -> float:
+    """Calculate the natural period using ASCE7-10 methodology (equation 12.8-7).
+
+    Kwargs:
         structure_type (Literal): Type of the structure:
             - "Steel MRF"
             - "Concrete MRF"
             - "Eccentrically braced SF"
-            - "Other systems"
+            - "Other systems
+        height (int | float): Height of the building in metres.
 
+    Returns:
+        float: The calculated natural period.
     """
+    COEFFICIENTS_TABLE = Path("src/building/coefficients/asce7-10.json")
 
-    coefficients_table: Path
-    structure_type: Literal[
-        "Steel MRF", "Concrete MRF", "Eccentrically braced SF", "Other systems"
-    ]
-
-    def __post_init__(self) -> None:
-
-        self.period = self._calculate_natural_period()
-
-    def _calculate_natural_period(self) -> float:
-        with open(self.coefficients_table) as f:
-            coefficients_data = json.load(f)
-            coefficients = coefficients_data["coefficients"][
-                self.structure_type
-            ]  # type: dict
-            ct = coefficients["Ct"]
-            x = coefficients["x"]
-            f.close()
-        return ct * self.height**x
+    with open(COEFFICIENTS_TABLE) as f:
+        coefficients_data = json.load(f)
+        coefficients = coefficients_data["coefficients"][structure_type]  # type: dict
+        ct = coefficients["Ct"]
+        x = coefficients["x"]
+    return ct * height**x

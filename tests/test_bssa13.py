@@ -1,12 +1,11 @@
 # std library imports
-import unittest
+from unittest import TestCase
 
 # library imports
-import pytest
 
 # module imports
-from building.core import Building
-from gmpe.bssa13.bssa13 import (
+from src.building.core import Building, SeismicProperties
+from src.gmpe.bssa13.bssa13 import (
     BSSA13GMPE,
     BSSA13EventTerm,
     BSSA13PathTerm,
@@ -14,11 +13,12 @@ from gmpe.bssa13.bssa13 import (
 )
 
 
-class TestBSSA13GMPEBasicFunctionality(unittest.TestCase):
+class TestBSSA13GMPEBasicFunctionality(TestCase):
     """Testing the GMPE's functionality."""
 
     def setUp(self) -> None:
-        building = Building(height=20, lat=100, long=200, period=1, vs30=350)
+        seismic_properties = SeismicProperties(height=20, period=1, vs30=350)
+        building = Building(lat=100, long=200, seismic_properties=seismic_properties)
         self.gmpe = BSSA13GMPE(
             building=building,
             magnitude=5,
@@ -144,7 +144,7 @@ class TestBSSA13GMPEBasicFunctionality(unittest.TestCase):
         self.assertAlmostEqual(self.gmpe.site_term.pga_r, 0.002909, 3)
         # check reversion to original properties:
         self.assertEqual(self.gmpe.magnitude, 5)
-        self.assertEqual(self.gmpe.building.period, 1)
+        self.assertEqual(self.gmpe.building.seismic_properties.period, 1)
         # check the non-linear component, which should evaluate to almost 0 for small pga.
         self.assertAlmostEqual(
             self.gmpe.site_term._calculate_nonlinear_component(), 0.00, 2
@@ -154,7 +154,3 @@ class TestBSSA13GMPEBasicFunctionality(unittest.TestCase):
         """Test the final output value."""
         # valid for Building(height=20, lat=100, long=200, period=1, vs30=350)
         self.assertAlmostEqual(self.gmpe.calculate(), -6.2603, 3)
-
-
-if __name__ == "__main__":
-    unittest.main()
